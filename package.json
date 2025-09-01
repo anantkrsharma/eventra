@@ -1,0 +1,33 @@
+{
+  "name": "calendar-mcp-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node server.ts",
+    "start:prod": "NODE_ENV=production ts-node server.ts",
+    "build": "tsc",
+    "serve": "node dist/server.js",
+    "db:init": "node init-db.js",
+    "db:studio": "npx prisma studio",
+    "db:migrate": "npx prisma migrate dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "@prisma/client": "^6.15.0",
+    "dotenv": "^17.2.1",
+    "googleapis": "^159.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "prisma": "^6.15.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}

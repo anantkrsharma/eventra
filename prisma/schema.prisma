@@ -1,0 +1,40 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// OAuth Token model to store authentication tokens securely
+model OAuthToken {
+  id            String   @id @default(uuid())
+  userId        String   @unique //unique identifier for the user
+  accessToken   String   //OAuth access token
+  refreshToken  String?  //OAuth refresh token (optional)
+  tokenType     String   //type of token (usually "Bearer")
+  scope         String?  //scopes granted
+  expiresAt     DateTime //when the access token expires
+  idToken       String?  //ID token (for OpenID Connect)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Calendar event sync state (optional, for future expansion)
+model CalendarSyncState {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  lastSyncedAt  DateTime
+  syncToken     String?  //for incremental sync
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
