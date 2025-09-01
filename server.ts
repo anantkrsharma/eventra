@@ -65,7 +65,7 @@ function getAuthUrl() {
 }
 
 const server = new McpServer({
-  name: "Calendar MCP Server",
+  name: "Eventra",
   version: "1.0.0",
 });
 

@@ -1,4 +1,4 @@
-# Calendar MCP Server
+# Eventra
 
 An MCP server that provides calendar integration tools for Large Language Models.
 
