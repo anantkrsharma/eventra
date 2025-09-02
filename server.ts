@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import dotenv from "dotenv";
+import * as dotenv from "dotenv";
 import { google } from "googleapis";
 import { z } from "zod";
-import http from "http";
-import { tokenStore } from "./utils/prisma-token-store.js";
-import { createOAuthServer } from "./utils/oauth-server.js";
+import * as http from "http";
+import { tokenStore } from "./utils/prisma-token-store.mjs";
+import { createOAuthServer } from "./utils/oauth-server.mjs";
 
 dotenv.config();
 
@@ -293,11 +293,18 @@ server.registerTool(
 
 //initialize and connect via stdio
 async function init() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  
-  //start the OAuth callback server
-  startProductionOAuthServer();
+  try {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    
+    //start the OAuth callback server
+    startProductionOAuthServer();
+    
+    console.log("MCP server initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize MCP server:", error);
+    process.exit(1);
+  }
 }
 
 //function to handle OAuth callback and display the code to the user with instructions

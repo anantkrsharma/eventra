@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-import { Credentials } from 'google-auth-library';
+import { PrismaClient } from '../lib/generated/client/index.js';
+// Import just what we need from Google
+import { OAuth2Client } from 'google-auth-library';
 
 // Initialize Prisma client
 const prisma = new PrismaClient();
@@ -15,7 +16,7 @@ export class PrismaTokenStore {
    * @param userId User identifier
    * @param tokens Google OAuth tokens
    */
-  async saveTokens(userId: string, tokens: Credentials): Promise<void> {
+  async saveTokens(userId, tokens) {
     try {
       if (!tokens.access_token) {
         throw new Error('Invalid tokens: access_token is required');
@@ -60,7 +61,7 @@ export class PrismaTokenStore {
    * @param userId User identifier
    * @returns Google OAuth credentials or null if not found
    */
-  async loadTokens(userId: string): Promise<Credentials | null> {
+  async loadTokens(userId) {
     try {
       const tokenRecord = await prisma.oAuthToken.findUnique({
         where: { userId }
@@ -96,7 +97,7 @@ export class PrismaTokenStore {
    * 
    * @param userId User identifier
    */
-  async deleteTokens(userId: string): Promise<void> {
+  async deleteTokens(userId) {
     try {
       await prisma.oAuthToken.delete({
         where: { userId }
@@ -114,7 +115,7 @@ export class PrismaTokenStore {
    * @param userId User identifier
    * @returns true if user has non-expired tokens
    */
-  async hasValidTokens(userId: string): Promise<boolean> {
+  async hasValidTokens(userId) {
     try {
       const count = await prisma.oAuthToken.count({
         where: {
@@ -133,7 +134,7 @@ export class PrismaTokenStore {
    * Clean up expired tokens from the database
    * This can be run periodically as a maintenance task
    */
-  async cleanupExpiredTokens(): Promise<number> {
+  async cleanupExpiredTokens() {
     try {
       const result = await prisma.oAuthToken.deleteMany({
         where: {
