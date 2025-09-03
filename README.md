@@ -25,7 +25,7 @@ An MCP server that provides calendar integration tools for Large Language Models
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/anantkrsharma/eventra
 cd eventra
 
 # Install dependencies
