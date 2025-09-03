@@ -6,8 +6,11 @@
   "scripts": {
     "start": "cross-env NODE_OPTIONS=--no-warnings ts-node --project tsconfig.node.json server.ts",
     "start:prod": "cross-env NODE_ENV=production NODE_OPTIONS=--no-warnings ts-node --project tsconfig.node.json server.ts",
+    "start:network": "cross-env MCP_TRANSPORT=network NODE_OPTIONS=--no-warnings ts-node --project tsconfig.node.json server.ts",
+    "start:network:prod": "cross-env NODE_ENV=production MCP_TRANSPORT=network NODE_OPTIONS=--no-warnings ts-node --project tsconfig.node.json server.ts",
     "build": "tsc",
     "serve": "cross-env NODE_OPTIONS=--no-warnings node dist/server.js",
+    "serve:network": "cross-env MCP_TRANSPORT=network NODE_OPTIONS=--no-warnings node dist/server.js",
     "db:init": "cross-env NODE_OPTIONS=--no-warnings node init-db.js",
     "db:studio": "npx prisma studio",
     "db:migrate": "npx prisma migrate dev"
@@ -18,11 +21,15 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@prisma/client": "^6.15.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.1",
+    "express": "^4.21.2",
     "googleapis": "^159.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.23",
     "@types/node": "^24.3.0",
     "cross-env": "^10.0.0",
     "prisma": "^6.15.0",

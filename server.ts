@@ -1,9 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import * as dotenv from "dotenv";
 import { google } from "googleapis";
 import { z } from "zod";
 import * as http from "http";
+import * as https from "https";
+import * as fs from "fs";
+import express from "express";
+import cors from "cors";
 import { tokenStore } from "./utils/prisma-token-store.mjs";
 import { createOAuthServer } from "./utils/oauth-server.mjs";
 
@@ -27,23 +32,6 @@ const oauth2Client = new google.auth.OAuth2(
 //   refresh_token: process.env.GOOGLE_REFRESH_TOKEN
 // });
 
-//load tokens from the database for the default user
-(async () => {
-  //get the default user ID from environment variables
-  const userId = process.env.DEFAULT_USER_ID || 'default_user';
-  
-  try {
-    const savedTokens = await tokenStore.loadTokens(userId);
-    
-    if (savedTokens) {
-      console.log('Loaded saved tokens for user from database');
-      oauth2Client.setCredentials(savedTokens);
-    }
-  } catch (err) {
-    console.error('Error loading tokens from database:', err);
-  }
-})();
-
 //calendar API with OAuth2 for creating events
 const calendarWithAuth = google.calendar({ 
   version: "v3", 
@@ -60,7 +48,7 @@ function getAuthUrl() {
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
-    prompt: 'consent' // Forces the approval prompt
+    prompt: 'consent'
   });
 }
 
@@ -291,20 +279,219 @@ server.registerTool(
   }
 );
 
-//initialize and connect via stdio
+//initialize and connect via stdio or network based on environment
 async function init() {
   try {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+    //initialize tokens first
+    await initializeTokens();
     
-    //start the OAuth callback server
-    startProductionOAuthServer();
+    const transportMode = process.env.MCP_TRANSPORT || 'stdio';
     
-    console.log("MCP server initialized successfully");
+    if (transportMode === 'network') {
+      await initNetworkMode();
+    } else {
+      await initStdioMode();
+    }
   } catch (error) {
     console.error("Failed to initialize MCP server:", error);
     process.exit(1);
   }
+}
+
+//initialize tokens from database
+async function initializeTokens() {
+  const userId = process.env.DEFAULT_USER_ID || 'default_user';
+  
+  try {
+    const savedTokens = await tokenStore.loadTokens(userId);
+    
+    if (savedTokens) {
+      console.log('Loaded saved tokens for user from database');
+      oauth2Client.setCredentials(savedTokens);
+    }
+  } catch (err) {
+    console.error('Error loading tokens from database:', err);
+  }
+}
+
+//initialize stdio mode (for Claude Desktop)
+async function initStdioMode() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  
+  //start the OAuth callback server
+  startProductionOAuthServer();
+  
+  console.log("MCP server initialized successfully (stdio mode)");
+}
+
+//initialize network mode (for public access)
+async function initNetworkMode() {
+  const port = parseInt(process.env.SERVER_PORT || '3000', 10);
+  const useHttps = process.env.USE_HTTPS === 'true';
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  const app = express();
+
+  app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control']
+  }));
+
+  app.use(express.json());
+
+  //health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      server: 'Eventra MCP Server',
+      version: '1.0.0'
+    });
+  });
+
+  //API documentation endpoint
+  app.get('/tools', (req, res) => {
+    res.json({
+      server: "Eventra MCP Server",
+      version: "1.0.0",
+      description: "Calendar integration tools for Large Language Models",
+      tools: [
+        {
+          name: "getMyCalendarDataByDate",
+          description: "Retrieve calendar events for a specific date",
+          parameters: {
+            date: "string (ISO date format, e.g., '2025-09-03')"
+          },
+          example: {
+            date: "2025-09-03"
+          }
+        },
+        {
+          name: "createCalendarEvent",
+          description: "Create a new calendar event",
+          parameters: {
+            summary: "string (required) - Event title",
+            description: "string (optional) - Event description",
+            startDateTime: "string (ISO datetime) - Event start time",
+            endDateTime: "string (ISO datetime) - Event end time",
+            location: "string (optional) - Event location"
+          },
+          example: {
+            summary: "Team Meeting",
+            description: "Weekly team sync",
+            startDateTime: "2025-09-03T14:00:00Z",
+            endDateTime: "2025-09-03T15:00:00Z",
+            location: "Conference Room A"
+          }
+        },
+        {
+          name: "setGoogleOAuthTokens",
+          description: "Set OAuth tokens after authorization",
+          parameters: {
+            code: "string (authorization code from OAuth flow)"
+          }
+        }
+      ],
+      connection: {
+        endpoint: "/sse",
+        protocol: "Server-Sent Events (SSE)",
+        usage: "Connect your MCP client to this endpoint to access the tools"
+      },
+      oauth: {
+        endpoint: "/oauth2callback",
+        description: "OAuth callback endpoint for Google Calendar authorization"
+      }
+    });
+  });
+
+  //SSE endpoint for MCP communication
+  app.get('/sse', async (req, res) => {
+    console.log('New SSE connection established');
+    
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    try {
+      const transport = new SSEServerTransport('/message', res);
+      await server.connect(transport);
+      console.log('MCP server connected via SSE');
+    } catch (error) {
+      console.error('Failed to establish SSE connection:', error);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: 'Connection failed' })}\n\n`);
+      res.end();
+    }
+  });
+
+  //handle POST requests to /message for SSE transport
+  app.post('/message', async (req, res) => {
+    //this will be handled by the SSE transport
+    res.status(200).json({ status: 'received' });
+  });
+
+  //OAuth callback endpoint
+  app.get('/oauth2callback', (req, res) => {
+    const code = req.query.code as string;
+    if (code) {
+      handleOAuthCallback(code, res);
+    } else {
+      res.status(400).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <h1>Authorization Failed</h1>
+            <p>No authorization code was received. Please try again.</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  let httpServer: http.Server | https.Server;
+
+  if (useHttps && isProduction) {
+    try {
+      const sslOptions = {
+        key: fs.readFileSync(process.env.SSL_KEY_PATH || './certs/key.pem'),
+        cert: fs.readFileSync(process.env.SSL_CERT_PATH || './certs/cert.pem')
+      };
+      
+      httpServer = https.createServer(sslOptions, app);
+      console.log('HTTPS server created');
+    } catch (error) {
+      console.error('Failed to create HTTPS server:', error);
+      console.log('Falling back to HTTP server');
+      httpServer = http.createServer(app);
+    }
+  } else {
+    httpServer = http.createServer(app);
+  }
+
+  //start the server
+  httpServer.listen(port, () => {
+    const protocol = useHttps && isProduction ? 'https' : 'http';
+    console.log(`🚀 Eventra MCP Server running on ${protocol}://localhost:${port}`);
+    console.log(`📡 MCP Endpoint: ${protocol}://localhost:${port}/sse`);
+    console.log(`🔧 API Documentation: ${protocol}://localhost:${port}/tools`);
+    console.log(`🔐 OAuth Callback: ${protocol}://localhost:${port}/oauth2callback`);
+    console.log(`💚 Health Check: ${protocol}://localhost:${port}/health`);
+    console.log(`🌍 Server mode: ${isProduction ? 'production' : 'development'}`);
+  });
+
+  //shutdown
+  process.on('SIGINT', () => {
+    console.log('\n👋 Shutting down gracefully...');
+    httpServer.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+  });
 }
 
 //function to handle OAuth callback and display the code to the user with instructions
@@ -312,21 +499,45 @@ function handleOAuthCallback(code: string, res: http.ServerResponse) {
   res.writeHead(200, { "Content-Type": "text/html" });
   res.end(`
     <html>
-      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <h1>Authorization Successful</h1>
-        <p>Please copy the code below and paste it back into your conversation with the AI assistant:</p>
-        <div style="background-color: #f0f0f0; padding: 15px; border-radius: 4px; margin: 20px 0;">
-          <code style="word-break: break-all; user-select: all;">${code}</code>
+      <head>
+        <title>Eventra - Authorization Successful</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+      </head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f5f5f5;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <h1 style="color: #4285f4; margin-bottom: 20px;">✅ Authorization Successful</h1>
+          <p>Please copy the code below and paste it back into your conversation with the AI assistant:</p>
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0; border: 1px solid #e9ecef;">
+            <code style="word-break: break-all; user-select: all; font-size: 14px; color: #d63384;">${code}</code>
+          </div>
+          <button onclick="copyToClipboard('${code}')" style="background-color: #4285f4; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px;">
+            📋 Copy Code
+          </button>
+          <button onclick="closeWindow()" style="background-color: #6c757d; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+            Close
+          </button>
+          <p style="margin-top: 20px; color: #6c757d; font-size: 14px;">
+            After pasting the code, the assistant will be able to create calendar events for you.
+          </p>
         </div>
-        <button onclick="copyToClipboard('${code}')" style="background-color: #4285f4; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">
-          Copy Code
-        </button>
-        <p style="margin-top: 20px;">After pasting the code, the assistant will be able to create calendar events for you.</p>
         <script>
           function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
               alert('Code copied to clipboard!');
+            }).catch(() => {
+              // Fallback for older browsers
+              const textArea = document.createElement('textarea');
+              textArea.value = text;
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textArea);
+              alert('Code copied to clipboard!');
             });
+          }
+          
+          function closeWindow() {
+            window.close();
           }
         </script>
       </body>

@@ -42,3 +42,9 @@ lib/generated/
 lib/generated/client/
 ./lib/generated/
 ./lib/generated/client/
+
+DEPLOYMENT.md
+
+# Demo and example files (optional - remove if you want to commit them)
+# demo-client.html
+# example-client.mjs
