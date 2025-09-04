@@ -42,7 +42,8 @@ const calendarWithAuth = google.calendar({
 function getAuthUrl() {
   const scopes = [
     'https://www.googleapis.com/auth/calendar',
-    'https://www.googleapis.com/auth/calendar.events'
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/userinfo.email'  // Added to get user's email
   ];
   
   return oauth2Client.generateAuthUrl({
@@ -52,21 +53,60 @@ function getAuthUrl() {
   });
 }
 
+//get user's email from their OAuth tokens
+async function getUserEmail(userId: string): Promise<string | null> {
+  try {
+    // First try to get from database
+    const storedEmail = await tokenStore.getUserEmail(userId);
+    if (storedEmail) {
+      return storedEmail;
+    }
+
+    // If not in database, try to get from Google API
+    const credentials = oauth2Client.credentials;
+    if (!credentials || !credentials.access_token) {
+      return null;
+    }
+
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+    const email = userInfo.data.email;
+
+    // Save email to database for future use
+    if (email) {
+      await tokenStore.saveTokens(userId, credentials, email);
+    }
+
+    return email || null;
+  } catch (error) {
+    console.error('Error getting user email:', error);
+    return null;
+  }
+}
+
+//get the calendar ID for a user (their email or 'primary')
+async function getCalendarId(userId: string): Promise<string> {
+  const userEmail = await getUserEmail(userId);
+  return userEmail || 'primary';
+}
+
 const server = new McpServer({
   name: "Eventra",
   version: "1.0.0",
 });
 
 //logic for fetching calendar data
-async function getMyCalendarDataByDate(date: string | number | Date) {
+async function getMyCalendarDataByDate(date: string | number | Date, userId: string = process.env.DEFAULT_USER_ID || 'default_user') {
   const start = new Date(date);
   start.setUTCHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
 
   try {
+    const calendarId = await getCalendarId(userId);
+    
     const res = await calendarReadOnly.events.list({
-      calendarId: process.env.CALENDAR_ID,
+      calendarId,
       timeMin: start.toISOString(),
       timeMax: end.toISOString(),
       maxResults: 10,
@@ -95,7 +135,7 @@ async function createCalendarEvent(eventDetails: {
   startDateTime: string;
   endDateTime: string;
   location?: string;
-}) {
+}, userId: string = process.env.DEFAULT_USER_ID || 'default_user') {
   try {
     //check if we have valid credentials
     const credentials = oauth2Client.credentials;
@@ -108,6 +148,8 @@ async function createCalendarEvent(eventDetails: {
         message: "Please visit the URL to authenticate and allow access to your Google Calendar."
       };
     }
+
+    const calendarId = await getCalendarId(userId);
 
     const event = {
       summary: eventDetails.summary,
@@ -124,7 +166,7 @@ async function createCalendarEvent(eventDetails: {
     };
 
     const response = await calendarWithAuth.events.insert({
-      calendarId: process.env.CALENDAR_ID,
+      calendarId,
       requestBody: event,
     });
 
@@ -247,9 +289,19 @@ server.registerTool(
       const { tokens } = await oauth2Client.getToken(code);
       oauth2Client.setCredentials(tokens);
       
-      // Save tokens securely
+      // Get user's email from Google
+      let userEmail: string | null = null;
+      try {
+        const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+        const userInfo = await oauth2.userinfo.get();
+        userEmail = userInfo.data.email || null;
+      } catch (emailError) {
+        console.error('Could not fetch user email:', emailError);
+      }
+      
+      // Save tokens securely with user email
       const userId = process.env.DEFAULT_USER_ID || 'default_user';
-      await tokenStore.saveTokens(userId, tokens);
+      await tokenStore.saveTokens(userId, tokens, userEmail);
       
       return {
         content: [
@@ -257,13 +309,58 @@ server.registerTool(
             type: "text", 
             text: JSON.stringify({ 
               success: true, 
-              message: "Authentication successful! You can now create calendar events." 
+              message: `Authentication successful! You can now create calendar events.${userEmail ? ` Connected to: ${userEmail}` : ''}` 
             }) 
           }
         ],
       };
     } catch (err) {
       console.error('Error getting tokens:', err);
+      return {
+        content: [
+          { 
+            type: "text", 
+            text: JSON.stringify({ 
+              success: false, 
+              error: err instanceof Error ? err.message : String(err) 
+            }) 
+          }
+        ],
+      };
+    }
+  }
+);
+
+//TOOL - tool to get current user info
+server.registerTool(
+  "getCurrentUserInfo",
+  {
+    title: "Get Current User Info",
+    description: "Get information about the currently authenticated user including their email.",
+    inputSchema: {}
+  },
+  async () => {
+    try {
+      const userId = process.env.DEFAULT_USER_ID || 'default_user';
+      const userEmail = await getUserEmail(userId);
+      const hasValidTokens = await tokenStore.hasValidTokens(userId);
+      
+      return {
+        content: [
+          { 
+            type: "text", 
+            text: JSON.stringify({ 
+              success: true,
+              userId,
+              userEmail,
+              isAuthenticated: hasValidTokens,
+              calendarId: userEmail || 'primary'
+            }) 
+          }
+        ],
+      };
+    } catch (err) {
+      console.error('Error getting user info:', err);
       return {
         content: [
           { 

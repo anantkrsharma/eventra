@@ -22,6 +22,7 @@ model CalendarSyncState {
 model OAuthToken {
   id           String   @id @default(uuid())
   userId       String   @unique
+  userEmail    String?  // Store user's Gmail email
   accessToken  String
   refreshToken String?
   tokenType    String
@@ -32,4 +33,5 @@ model OAuthToken {
   updatedAt    DateTime @updatedAt
 
   @@index([userId])
+  @@index([userEmail])
 }

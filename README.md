@@ -1,11 +1,12 @@
 # Eventra
 
-An MCP server that provides calendar integration tools for Large Language Models. Supports both local (stdio) and public (network) access modes.
+An MCP server that provides calendar integration tools for Large Language Models. Supports both local (stdio) and public (network) access modes with **dynamic user-based calendar access**.
 
 ## Features
 
-- 📅 Fetch calendar events by date
-- ➕ Create new calendar events
+- 📅 Fetch calendar events by date from **authenticated user's calendar**
+- ➕ Create new calendar events in **authenticated user's calendar**
+- 👤 **Dynamic calendar ID based on user's Gmail account**
 - 🔐 OAuth2 authentication flow with secure token storage
 - 💾 PostgreSQL database for persistent token storage
 - 🌐 **Network mode for public accessibility**
@@ -45,7 +46,7 @@ GOOGLE_PUBLIC_API_KEY=your_api_key
 GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
 GOOGLE_REDIRECT_URL=http://localhost:3000/oauth2callback
-CALENDAR_ID=your_calendar_id
+# Note: CALENDAR_ID is no longer needed - uses authenticated user's calendar
 
 # Server Configuration
 NODE_ENV=development
@@ -142,6 +143,7 @@ Update `.env` for production:
 NODE_ENV=production
 USE_HTTPS=true
 GOOGLE_REDIRECT_URL=https://yourdomain.com/oauth2callback
+# Note: CALENDAR_ID removed - uses authenticated user's calendar automatically
 TOKEN_ENCRYPTION_KEY=your_strong_production_key
 DATABASE_URL="your_production_database_url"
 ```
@@ -278,6 +280,31 @@ Set OAuth tokens after user authorization.
 
 **Parameters:**
 - `code` (string, required): Authorization code from OAuth flow
+
+### 4. `getCurrentUserInfo`
+Get information about the currently authenticated user.
+
+**Response includes:**
+- `userId`: Internal user identifier
+- `userEmail`: User's Gmail address (used as calendar ID)
+- `isAuthenticated`: Whether user has valid tokens
+- `calendarId`: The calendar ID being used (user's email or 'primary')
+
+## How Dynamic Calendar ID Works
+
+The system automatically uses the authenticated user's Gmail account as their calendar ID:
+
+1. **During OAuth Flow**: When a user authenticates, the system requests the `userinfo.email` scope
+2. **Email Extraction**: The user's Gmail address is extracted from their Google profile
+3. **Storage**: The email is stored securely in the database alongside their OAuth tokens
+4. **Dynamic Usage**: All calendar operations (reading/creating events) use the user's email as the calendar ID
+5. **Fallback**: If email cannot be determined, the system falls back to `'primary'` (user's default calendar)
+
+This means:
+- ✅ Each user sees their own calendar events
+- ✅ Events are created in the correct user's calendar
+- ✅ No hardcoded calendar IDs needed
+- ✅ Multi-user support out of the box
 
 ## OAuth Flow
 

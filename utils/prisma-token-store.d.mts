@@ -10,8 +10,9 @@ export class PrismaTokenStore {
    * 
    * @param userId User identifier
    * @param tokens Google OAuth tokens
+   * @param userEmail User's Gmail email (optional)
    */
-  saveTokens(userId: string, tokens: Credentials): Promise<void>;
+  saveTokens(userId: string, tokens: Credentials, userEmail?: string | null): Promise<void>;
 
   /**
    * Load OAuth tokens from the database
@@ -20,6 +21,14 @@ export class PrismaTokenStore {
    * @returns Google OAuth credentials or null if not found
    */
   loadTokens(userId: string): Promise<Credentials | null>;
+
+  /**
+   * Get user's email from the database
+   * 
+   * @param userId User identifier
+   * @returns User's email or null if not found
+   */
+  getUserEmail(userId: string): Promise<string | null>;
 
   /**
    * Delete OAuth tokens from the database

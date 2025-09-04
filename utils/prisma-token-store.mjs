@@ -15,8 +15,9 @@ export class PrismaTokenStore {
    * 
    * @param userId User identifier
    * @param tokens Google OAuth tokens
+   * @param userEmail User's Gmail email (optional)
    */
-  async saveTokens(userId, tokens) {
+  async saveTokens(userId, tokens, userEmail = null) {
     try {
       if (!tokens.access_token) {
         throw new Error('Invalid tokens: access_token is required');
@@ -35,6 +36,7 @@ export class PrismaTokenStore {
           scope: tokens.scope,
           expiresAt,
           idToken: tokens.id_token,
+          userEmail,
           updatedAt: new Date()
         },
         create: {
@@ -44,11 +46,12 @@ export class PrismaTokenStore {
           tokenType: tokens.token_type || 'Bearer',
           scope: tokens.scope,
           expiresAt,
-          idToken: tokens.id_token
+          idToken: tokens.id_token,
+          userEmail
         }
       });
 
-      console.log(`Tokens saved for user ${userId}`);
+      console.log(`Tokens saved for user ${userId}${userEmail ? ` (${userEmail})` : ''}`);
     } catch (error) {
       console.error('Failed to save tokens to database:', error);
       throw new Error('Failed to save tokens to database');
@@ -127,6 +130,26 @@ export class PrismaTokenStore {
     } catch (error) {
       console.error('Failed to check token validity:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get user's email from the database
+   * 
+   * @param userId User identifier
+   * @returns User's email or null if not found
+   */
+  async getUserEmail(userId) {
+    try {
+      const tokenRecord = await prisma.oAuthToken.findUnique({
+        where: { userId },
+        select: { userEmail: true }
+      });
+
+      return tokenRecord ? tokenRecord.userEmail : null;
+    } catch (error) {
+      console.error('Failed to get user email from database:', error);
+      return null;
     }
   }
 
