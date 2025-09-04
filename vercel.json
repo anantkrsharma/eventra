@@ -1,24 +1,18 @@
 {
     "version": 2,
-    "builds": [
-        {
-            "src": "server.ts",
-            "use": "@vercel/node"
+    "functions": {
+        "dist/server.js": {
+            "maxDuration": 30
         }
-    ],
-    "routes": [
+    },
+    "rewrites": [
         {
-            "src": "/(.*)",
-            "dest": "/server.ts"
+            "source": "/(.*)",
+            "destination": "/dist/server.js"
         }
     ],
     "env": {
         "NODE_OPTIONS": "--no-warnings",
         "MCP_TRANSPORT": "network"
-    },
-    "functions": {
-        "server.ts": {
-            "maxDuration": 30
-        }
     }
 }
