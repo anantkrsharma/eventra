@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar MCP Server - Public API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        
+        .card p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: transform 0.2s ease;
+            font-weight: 600;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .endpoints {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .endpoints h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+        
+        .endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .endpoint code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .status {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+        }
+        
+        .integration-example {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Eventra</h1>
+            <p>Public Model Context Protocol server for Google Calendar integration</p>
+        </div>
+        
+        <div class="cards">
+            <div class="card">
+                <h3>Quick Start</h3>
+                <p>Connect your LLM applications to Google Calendar with our MCP server. Get started with calendar management tools in minutes.</p>
+                <a href="/tools" class="btn">View API Documentation</a>
+            </div>
+            
+            <div class="card">
+                <h3>API Tools</h3>
+                <p>Browse the available calendar management tools and their parameters. Perfect for understanding what's possible with this MCP server.</p>
+                <a href="/tools" class="btn">View Tools</a>
+            </div>
+            
+            <div class="card">
+                <h3>Integration Guide</h3>
+                <p>Complete integration examples and OAuth flow documentation for connecting your applications to this MCP server.</p>
+                <a href="https://github.com/anantkrsharma/eventra" class="btn">GitHub Repo</a>
+            </div>
+        </div>
+        
+        <div class="endpoints">
+            <h3>API Endpoints</h3>
+            <div class="endpoint">
+                <strong>MCP Connection:</strong> <code>GET /sse</code><br>
+                Server-Sent Events endpoint for MCP client connections
+            </div>
+            <div class="endpoint">
+                <strong>API Documentation:</strong> <code>GET /tools</code><br>
+                JSON documentation of available tools and parameters
+            </div>
+            <div class="endpoint">
+                <strong>Health Check:</strong> <code>GET /health</code><br>
+                Server status and uptime information
+            </div>
+            <div class="endpoint">
+                <strong>OAuth Callback:</strong> <code>GET /oauth2callback</code><br>
+                Google OAuth authorization callback handler
+            </div>
+        </div>
+        
+        <div class="status">
+            <h3>🟢 Server Status</h3>
+            <p>
+                <span class="status-indicator"></span>
+                <strong>Online and Ready</strong>
+            </p>
+            <p>Server is running and accepting MCP connections</p>
+        </div>
+        
+        <div class="integration-example">
+            <h3>🔌 Integration Example</h3>
+            <p>Connect to this MCP server from your LLM applications:</p>
+            <div class="code-block">
+                import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+                import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+
+                const transport = new SSEClientTransport(
+                new URL("${window.location.origin}/sse")
+                );
+
+                const client = new Client(
+                { name: "calendar-client", version: "1.0.0" },
+                { capabilities: {} }
+                );
+
+                await client.connect(transport);
+
+                // Get calendar events for today
+                const events = await client.callTool("getMyCalendarDataByDate", {
+                date: new Date().toISOString().split('T')[0]
+                });
+            </div>
+        </div>
+    </div>
+</body>
+</html>

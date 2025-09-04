@@ -7,6 +7,8 @@ import { z } from "zod";
 import * as http from "http";
 import * as https from "https";
 import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from 'url';
 import express from "express";
 import cors from "cors";
 import { tokenStore } from "./utils/prisma-token-store.mjs";
@@ -56,13 +58,12 @@ function getAuthUrl() {
 //get user's email from their OAuth tokens
 async function getUserEmail(userId: string): Promise<string | null> {
   try {
-    // First try to get from database
+    //first try to get from database, if not in database, try to get from Google API
     const storedEmail = await tokenStore.getUserEmail(userId);
     if (storedEmail) {
       return storedEmail;
     }
 
-    // If not in database, try to get from Google API
     const credentials = oauth2Client.credentials;
     if (!credentials || !credentials.access_token) {
       return null;
@@ -72,7 +73,7 @@ async function getUserEmail(userId: string): Promise<string | null> {
     const userInfo = await oauth2.userinfo.get();
     const email = userInfo.data.email;
 
-    // Save email to database for future use
+    //save email to database for future use
     if (email) {
       await tokenStore.saveTokens(userId, credentials, email);
     }
@@ -289,7 +290,7 @@ server.registerTool(
       const { tokens } = await oauth2Client.getToken(code);
       oauth2Client.setCredentials(tokens);
       
-      // Get user's email from Google
+      //get user's email from Google
       let userEmail: string | null = null;
       try {
         const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
@@ -299,7 +300,7 @@ server.registerTool(
         console.error('Could not fetch user email:', emailError);
       }
       
-      // Save tokens securely with user email
+      //save tokens securely with user email
       const userId = process.env.DEFAULT_USER_ID || 'default_user';
       await tokenStore.saveTokens(userId, tokens, userEmail);
       
@@ -438,6 +439,11 @@ async function initNetworkMode() {
   }));
 
   app.use(express.json());
+  
+  //serve static files from public directory
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  app.use(express.static(path.join(__dirname, 'public')));
 
   //health check endpoint
   app.get('/health', (req, res) => {

@@ -2,17 +2,23 @@
     "version": 2,
     "builds": [
         {
-        "src": "dist/server.js",
-        "use": "@vercel/node"
+            "src": "server.ts",
+            "use": "@vercel/node"
         }
     ],
     "routes": [
         {
-        "src": "/(.*)",
-        "dest": "/dist/server.js"
+            "src": "/(.*)",
+            "dest": "/server.ts"
         }
     ],
     "env": {
-        "NODE_OPTIONS": "--no-warnings"
+        "NODE_OPTIONS": "--no-warnings",
+        "MCP_TRANSPORT": "network"
+    },
+    "functions": {
+        "server.ts": {
+            "maxDuration": 30
+        }
     }
 }
