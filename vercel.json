@@ -1,14 +1,18 @@
 {
     "version": 2,
-    "functions": {
-        "dist/server.js": {
-            "maxDuration": 30
-        }
-    },
-    "rewrites": [
+    "builds": [
         {
-            "source": "/(.*)",
-            "destination": "/dist/server.js"
+            "src": "server.ts",
+            "use": "@vercel/node",
+            "config": {
+                "maxLambdaSize": "50mb"
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "/server.ts"
         }
     ],
     "env": {
